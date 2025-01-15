@@ -15,8 +15,8 @@ Config.PoliceGarages = {
         },
         vehicleList = {
             {model = "police", label = "Police Cruiser", rank = 1},
-            {model = "police2", label = "Police Interceptor", rank = 1},
-            {model = "sheriff", label = "Sheriff Vehicle", rank = 1},
+            {model = "police2", label = "Police Interceptor", rank = 2},
+            {model = "sheriff", label = "Sheriff Vehicle", rank = 3},
         }
     },--[[
     {
