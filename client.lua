@@ -53,6 +53,55 @@ local function spawnPedAndGarageInteractions()
 end
 
 
+local function spawnBossMenuPeds()
+    if not Config.BossMenus or type(Config.BossMenus) ~= "table" then
+        debugPrint("Config.BossMenus is not defined or is not a table, skipping boss menu ped setup.")
+        return
+    end
+
+    debugPrint("Spawning peds for boss menus...")
+
+    for _, bossMenu in ipairs(Config.BossMenus) do
+        if not bossMenu.pedCoords then
+            debugPrint("Boss menu entry missing pedCoords, skipping.")
+        else
+            local pedModel = bossMenu.pedModel or `s_m_m_security_01`
+
+            RequestModel(pedModel)
+            while not HasModelLoaded(pedModel) do
+                Wait(500)
+            end
+
+            local ped = CreatePed(4, pedModel, bossMenu.pedCoords.x, bossMenu.pedCoords.y, bossMenu.pedCoords.z, bossMenu.pedHeading or 0.0, false, true)
+            SetEntityInvincible(ped, true)
+            SetEntityVisible(ped, true)
+            FreezeEntityPosition(ped, true)
+
+            exports['qb-target']:AddTargetEntity(ped, {
+                options = {
+                    {
+                        type = "client",
+                        event = "qb-policehelper:openBossMenu",
+                        icon = bossMenu.icon or "fas fa-briefcase",
+                        label = bossMenu.label or "Open Boss Menu",
+                        job = bossMenu.job,
+                        jobType = bossMenu.jobType,
+                        args = {
+                            job = bossMenu.job,
+                            minimumGrade = bossMenu.minimumGrade,
+                            requireBoss = bossMenu.requireBoss,
+                        }
+                    }
+                },
+                distance = bossMenu.distance or 2.0
+            })
+
+            debugPrint("Boss menu ped created for job: " .. (bossMenu.job or "unknown"))
+        end
+    end
+end
+
+
 local function setupJobActions()
     if not Config.Actions or type(Config.Actions) ~= "table" then
         debugPrint("Error: Config.Actions is not defined or is not a table!")
@@ -183,6 +232,62 @@ RegisterNetEvent('qb-policehelper:openGarageMenu', function(data)
 end)
 
 
+RegisterNetEvent('qb-policehelper:openBossMenu', function(optionData)
+    local args = nil
+    if optionData then
+        if optionData.args then
+            args = optionData.args
+        elseif optionData.option and optionData.option.args then
+            args = optionData.option.args
+        end
+    end
+
+    local data = args or optionData or {}
+    local PlayerData = QBCore.Functions.GetPlayerData()
+    local jobData = PlayerData and PlayerData.job or {}
+    local playerJob = jobData.name
+    local playerGrade = jobData.grade
+    local requiredJob = data and data.job or nil
+    local minimumGrade = data and data.minimumGrade or 0
+    local requireBoss = data and data.requireBoss
+
+    if not requiredJob then
+        debugPrint("Boss menu interaction missing job requirement, aborting.")
+        QBCore.Functions.Notify("Boss menu not configured correctly.", "error")
+        return
+    end
+
+    if playerJob ~= requiredJob then
+        QBCore.Functions.Notify("You are not employed here.", "error")
+        return
+    end
+
+    if type(playerGrade) == "table" then
+        if playerGrade.grade then
+            playerGrade = playerGrade.grade
+        elseif playerGrade.level then
+            playerGrade = playerGrade.level
+        else
+            playerGrade = 0
+        end
+    end
+
+    playerGrade = tonumber(playerGrade) or 0
+
+    if requireBoss ~= false and not jobData.isboss then
+        QBCore.Functions.Notify("Only bosses can access this menu.", "error")
+        return
+    end
+
+    if minimumGrade and playerGrade < minimumGrade then
+        QBCore.Functions.Notify("You do not have the required rank.", "error")
+        return
+    end
+
+    TriggerServerEvent('qb-bossmenu:server:openMenu')
+end)
+
+
 RegisterNetEvent('qb-policehelper:spawnVehicle', function(data)
     local vehicleModel = data.vehicleModel
     local spawnLocation = data.spawnLocation
@@ -248,4 +353,5 @@ RegisterNetEvent('qb-policehelper:spawnVehicle', function(data)
 end)
 
 spawnPedAndGarageInteractions()
+spawnBossMenuPeds()
 setupJobActions()
