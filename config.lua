@@ -1,4 +1,3 @@
-
 Config = {}
 
 Config.debug = true  -- Set to false to disable debug prints
@@ -6,6 +5,7 @@ Config.debug = true  -- Set to false to disable debug prints
 Config.PoliceGarages = {
     {
         name = "Police Garage 1",
+        pedModel = `s_m_y_cop_01`,
         pedCoords = vector3(441.9710, -1013.5137, 28.6264),
         pedHeading = 186.8343,
         carSpawns = {

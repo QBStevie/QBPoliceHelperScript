@@ -1,11 +1,11 @@
 local QBCore = exports['qb-core']:GetCoreObject()
 local Config = Config or {}  -- Load the config
 
--- Function to print debug messages
-local function debugPrint(message)
-    if Config.debug then
-        print(message)  
-    end
+--- Simple helper that only prints when debugging is enabled.
+---@param ... any
+local function debugPrint(...)
+    if not Config.debug then return end
+    print(...)
 end
 
 -- Function to spawn the ped and garage interactions
@@ -20,12 +20,14 @@ local function spawnPedAndGarageInteractions()
     for _, garage in ipairs(Config.PoliceGarages) do
         debugPrint("Creating ped for garage: " .. garage.name)  -- Debug message for each garage
 
-        RequestModel(`s_m_y_cop_01`)
-        while not HasModelLoaded(`s_m_y_cop_01`) do
+        local pedModel = garage.pedModel or `s_m_y_cop_01`
+
+        RequestModel(pedModel)
+        while not HasModelLoaded(pedModel) do
             Wait(500)
         end
 
-        local ped = CreatePed(4, `s_m_y_cop_01`, garage.pedCoords.x, garage.pedCoords.y, garage.pedCoords.z, garage.pedHeading, false, true)
+        local ped = CreatePed(4, pedModel, garage.pedCoords.x, garage.pedCoords.y, garage.pedCoords.z, garage.pedHeading, false, true)
         SetEntityInvincible(ped, true)
         SetEntityVisible(ped, true)
         FreezeEntityPosition(ped, true)
@@ -60,7 +62,7 @@ local function setupJobActions()
     debugPrint("Setting up job actions...")  -- Debug message for setting up actions
 
     for _, action in ipairs(Config.Actions) do
-        exports['qb-target']:AddTargetEntity(GetPlayerPed(-1), {
+        exports['qb-target']:AddTargetEntity(PlayerPedId(), {
             options = {
                 {
                     type = action.type,
@@ -88,6 +90,10 @@ RegisterNetEvent('qb-policehelper:openGarageMenu', function(data)
     local playerRank = PlayerData.job.grade 
 
 
+    if garageName then
+        debugPrint("Opening garage menu for:", garageName)
+    end
+
     if not carSpawns then
         debugPrint("Error: carSpawns is not available in the received data!")
         QBCore.Functions.Notify("Error: carSpawns is missing!", "error")
@@ -98,6 +104,12 @@ RegisterNetEvent('qb-policehelper:openGarageMenu', function(data)
     if type(carSpawns) ~= "table" then
         debugPrint("Error: carSpawns is not a valid table!")
         QBCore.Functions.Notify("Error: carSpawns is not a valid table!", "error")
+        return
+    end
+
+    if type(vehicleList) ~= "table" then
+        debugPrint("Error: vehicleList is not a valid table!")
+        QBCore.Functions.Notify("Error: vehicle list is missing!", "error")
         return
     end
 
@@ -118,20 +130,30 @@ RegisterNetEvent('qb-policehelper:openGarageMenu', function(data)
         else
             playerRank = 0  
         end
-        print("Player Rank (Fixed): ", playerRank)  
+        debugPrint("Player Rank (Fixed):", playerRank)
+    end
+
+    local sanitizedSpawns = {}
+    for index, spawn in ipairs(carSpawns) do
+        if spawn and spawn.x and spawn.y and spawn.z and spawn.w then
+            sanitizedSpawns[index] = { x = spawn.x, y = spawn.y, z = spawn.z, w = spawn.w }
+        end
     end
 
     local options = {}
     for i, vehicle in ipairs(vehicleList) do
+        debugPrint("Vehicle rank for", vehicle.label, ":", vehicle.rank)
 
-        print("Vehicle rank for " .. vehicle.label .. ": ", vehicle.rank)
+        local spawnLocation = sanitizedSpawns[i]
+        local hasRequiredRank = type(vehicle.rank) == "number" and playerRank >= vehicle.rank
+        local hasModel = type(vehicle.model) == "string" and vehicle.model ~= ""
 
-        if type(vehicle.rank) == "number" and playerRank >= vehicle.rank then
+        if hasRequiredRank and hasModel and spawnLocation then
             table.insert(options, {
                 label = vehicle.label,
                 vehicleModel = vehicle.model,
-                spawnLocation = carSpawns[i], 
-                requiredRank = vehicle.rank  
+                spawnLocation = spawnLocation,
+                requiredRank = vehicle.rank
             })
         end
     end
@@ -146,7 +168,8 @@ RegisterNetEvent('qb-policehelper:openGarageMenu', function(data)
                     event = 'qb-policehelper:spawnVehicle',
                     args = {
                         vehicleModel = option.vehicleModel,
-                        spawnLocation = option.spawnLocation
+                        spawnLocation = option.spawnLocation,
+                        carSpawns = sanitizedSpawns
                     }
                 }
             })
@@ -163,12 +186,14 @@ end)
 RegisterNetEvent('qb-policehelper:spawnVehicle', function(data)
     local vehicleModel = data.vehicleModel
     local spawnLocation = data.spawnLocation
+    local carSpawns = data.carSpawns or {}
 
-    local function isSpawnOccupied(spawnLocation)
+    local function isSpawnOccupied(location)
+        if not location then return true end
         local vehicles = GetGamePool('CVehicle')
         for _, vehicle in ipairs(vehicles) do
             local vehiclePos = GetEntityCoords(vehicle)
-            local distance = Vdist(vehiclePos.x, vehiclePos.y, vehiclePos.z, spawnLocation.x, spawnLocation.y, spawnLocation.z)
+            local distance = Vdist(vehiclePos.x, vehiclePos.y, vehiclePos.z, location.x, location.y, location.z)
             if distance < 5.0 then
                 return true
             end
@@ -176,12 +201,14 @@ RegisterNetEvent('qb-policehelper:spawnVehicle', function(data)
         return false
     end
 
-    debugPrint("Available carSpawns: ", json.encode(data.carSpawns))
+    debugPrint("Requested vehicle model: ", vehicleModel)
+    debugPrint("Primary spawn location: ", json.encode(spawnLocation or {}))
+    debugPrint("Available carSpawns: ", json.encode(carSpawns))
 
     if isSpawnOccupied(spawnLocation) then
         debugPrint("Spawn point occupied. Searching for an empty spot...")
         local foundEmptySpot = false
-        for _, newSpawn in ipairs(data.carSpawns) do
+        for _, newSpawn in ipairs(carSpawns) do
             if not isSpawnOccupied(newSpawn) then
                 spawnLocation = newSpawn
                 debugPrint("Found an available spawn point.")
@@ -197,6 +224,12 @@ RegisterNetEvent('qb-policehelper:spawnVehicle', function(data)
         end
     end
 
+    if not vehicleModel or not spawnLocation then
+        debugPrint("Vehicle model or spawn location missing, aborting spawn.")
+        QBCore.Functions.Notify("Invalid vehicle information received!", "error")
+        return
+    end
+
     RequestModel(vehicleModel)
     while not HasModelLoaded(vehicleModel) do
         Wait(500)
@@ -207,7 +240,8 @@ RegisterNetEvent('qb-policehelper:spawnVehicle', function(data)
     exports['LegacyFuel']:SetFuel(vehicle, 100.0)
 
     SetEntityAsMissionEntity(vehicle, true, true)
-    TaskWarpPedIntoVehicle(GetPlayerPed(-1), vehicle, -1)
+    local playerPed = PlayerPedId()
+    TaskWarpPedIntoVehicle(playerPed, vehicle, -1)
 
 
     debugPrint("Vehicle spawned with full fuel: " .. vehicleModel)
