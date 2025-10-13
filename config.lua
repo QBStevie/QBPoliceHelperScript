@@ -36,6 +36,18 @@ Config.PoliceGarages = {
     }--]]
 }
 
+Config.BossMenus = {
+    {
+        job = "police",
+        label = "Police Boss Menu",
+        pedModel = `s_m_y_cop_01`,
+        pedCoords = vector3(461.8842, -981.1580, 30.6896),
+        pedHeading = 90.0,
+        minimumGrade = 4, -- Minimum grade allowed to open (set nil to skip)
+        requireBoss = true -- Set to false if non-boss grades should be able to use the menu
+    }
+}
+
 Config.Actions = {
     -- Police actions
     { type = "client", event = "police:client:CuffPlayer", icon = "fas fa-hands", label = "Handfängsla", job = "police", item = 'Handcuff Person' },
