@@ -1,6 +1,8 @@
 Config = {}
 
 Config.debug = true  -- Set to false to disable debug prints
+Config.Departments = { 'police', 'bcso', 'sasp', 'fib', 'ranger' }
+Config.SharedGarageJobs = {} -- Add job names here to allow those jobs to use any garage.
 
 Config.PoliceGarages = {
     {
@@ -14,9 +16,9 @@ Config.PoliceGarages = {
             vector4(431.3347, -1027.7228, 28.5253, 2.9451),
         },
         vehicleList = {
-            {model = "police", label = "Police Cruiser", rank = 1},
-            {model = "police2", label = "Police Interceptor", rank = 2},
-            {model = "sheriff", label = "Sheriff Vehicle", rank = 3},
+            {model = "police", label = "Police Cruiser", rank = 1, type = "car", fuel = 100},
+            {model = "police2", label = "Police Interceptor", rank = 2, type = "car", fuel = 100},
+            {model = "sheriff", label = "Sheriff Vehicle", rank = 3, type = "car", fuel = 100},
         }
     },
     {
@@ -31,8 +33,8 @@ Config.PoliceGarages = {
             vector4(-470.6, 6029.5, 31.3, 45.0),
         },
         vehicleList = {
-            {model = "sheriff", label = "BCSO Sheriff Cruiser", rank = 1},
-            {model = "sheriff2", label = "BCSO Sheriff SUV", rank = 2},
+            {model = "sheriff", label = "BCSO Sheriff Cruiser", rank = 1, type = "car", fuel = 100},
+            {model = "sheriff2", label = "BCSO Sheriff SUV", rank = 2, type = "car", fuel = 100},
         }
     },--[[
     {
@@ -71,6 +73,30 @@ Config.BossMenus = {
         minimumGrade = 4,
         requireBoss = true
     }
+}
+
+-- Generic job-target locations. Configure an event for integrations supplied by
+-- your server; locations without an event display a helpful notification.
+Config.DutyPoints = {}
+Config.Armories = {}
+Config.EvidenceLockers = {}
+Config.PersonalLockers = {}
+Config.ClothingRooms = {}
+Config.Impounds = {}
+Config.HelicopterGarages = {}
+Config.BoatGarages = {}
+
+Config.LocationCategories = {
+    garages = Config.PoliceGarages,
+    bosses = Config.BossMenus,
+    duty = Config.DutyPoints,
+    armories = Config.Armories,
+    evidence = Config.EvidenceLockers,
+    personal = Config.PersonalLockers,
+    clothing = Config.ClothingRooms,
+    impounds = Config.Impounds,
+    helicopters = Config.HelicopterGarages,
+    boats = Config.BoatGarages,
 }
 
 Config.Actions = {
