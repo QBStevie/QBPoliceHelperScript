@@ -18,6 +18,22 @@ Config.PoliceGarages = {
             {model = "police2", label = "Police Interceptor", rank = 2},
             {model = "sheriff", label = "Sheriff Vehicle", rank = 3},
         }
+    },
+    {
+        name = "BCSO Paleto Garage",
+        job = "bcso",
+        pedModel = `s_m_y_sheriff_01`,
+        pedCoords = vector3(-449.0, 6013.2, 31.7),
+        pedHeading = 45.0,
+        carSpawns = {
+            vector4(-461.6, 6021.5, 31.3, 45.0),
+            vector4(-466.1, 6025.5, 31.3, 45.0),
+            vector4(-470.6, 6029.5, 31.3, 45.0),
+        },
+        vehicleList = {
+            {model = "sheriff", label = "BCSO Sheriff Cruiser", rank = 1},
+            {model = "sheriff2", label = "BCSO Sheriff SUV", rank = 2},
+        }
     },--[[
     {
         name = "Police Garage 2",
@@ -45,6 +61,15 @@ Config.BossMenus = {
         pedHeading = 180.0,
         minimumGrade = 4, -- Minimum grade allowed to open (set nil to skip)
         requireBoss = true -- Set to false if non-boss grades should be able to use the menu
+    },
+    {
+        job = "bcso",
+        label = "BCSO Boss Menu",
+        pedModel = `s_m_y_sheriff_01`,
+        pedCoords = vector3(-443.5, 6012.7, 31.7),
+        pedHeading = 45.0,
+        minimumGrade = 4,
+        requireBoss = true
     }
 }
 
