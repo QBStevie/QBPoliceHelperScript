@@ -149,6 +149,7 @@ RegisterNetEvent('qb-policehelper:openGarageMenu', function(data)
     debugPrint("Received data:", json.encode(data)) 
     local garageName = data.garage_name
     local garageIndex = tonumber(data.garageIndex)
+    local garage = garageIndex and Config.PoliceGarages[garageIndex]
     local carSpawns = data.carSpawns
     local vehicleList = data.vehicleList
     local PlayerData = QBCore.Functions.GetPlayerData()
@@ -183,7 +184,7 @@ RegisterNetEvent('qb-policehelper:openGarageMenu', function(data)
     debugPrint("Player Rank (Raw): ", json.encode(playerRank))
 
 
-    if playerJob ~= "police" then
+    if not garage or playerJob ~= (garage.job or "police") then
         QBCore.Functions.Notify("You are not a Law Enforcement Officer, you cannot access this garage.", "error")
         return
     end

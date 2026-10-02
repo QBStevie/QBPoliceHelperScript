@@ -21,6 +21,7 @@ Config.PoliceGarages = {
     },
     {
         name = "BCSO Paleto Garage",
+        job = "bcso",
         pedModel = `s_m_y_sheriff_01`,
         pedCoords = vector3(-449.0, 6013.2, 31.7),
         pedHeading = 45.0,

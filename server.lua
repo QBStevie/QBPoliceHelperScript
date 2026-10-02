@@ -125,7 +125,7 @@ RegisterNetEvent('qb-policehelper:server:requestVehicle', function(garageIndex, 
 
     local job = Player.PlayerData.job
     local garage = Config.PoliceGarages[garageIndex]
-    if not job or job.name ~= 'police' then
+    if not job or job.name ~= (garage.job or 'police') then
         notify(src, 'You are not authorized to use this garage.')
         return
     end

@@ -10,7 +10,7 @@ This resource provides configurable helpers for law-enforcement focused servers 
 
 ## Configuration
 
-All configuration lives in [`config.lua`](config.lua). You can enable/disable verbose debugging, adjust garage locations, and specify per-garage ped models, spawn points, and vehicle unlock ranks.
+All configuration lives in [`config.lua`](config.lua). You can enable/disable verbose debugging, adjust garage locations, and specify per-garage job requirements, ped models, spawn points, and vehicle unlock ranks. Garages default to the `police` job when `job` is omitted.
 
 ```lua
 Config.debug = true
@@ -18,6 +18,7 @@ Config.debug = true
 Config.PoliceGarages = {
     {
         name = "Police Garage 1",
+        job = "police",
         pedModel = `s_m_y_cop_01`,
         pedCoords = vector3(441.9710, -1013.5137, 28.6264),
         pedHeading = 186.8343,
