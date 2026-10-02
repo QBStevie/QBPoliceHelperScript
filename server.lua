@@ -7,6 +7,11 @@ local function notify(source, message, messageType)
     TriggerClientEvent('QBCore:Notify', source, message, messageType or 'error')
 end
 
+local function getPlate(vehicle)
+    local plate = GetVehicleNumberPlateText(vehicle) or ''
+    return plate:match('^%s*(.-)%s*$')
+end
+
 local function isAdmin(source)
     return QBCore.Functions.HasPermission(source, 'admin')
         or QBCore.Functions.HasPermission(source, 'god')
@@ -439,6 +444,14 @@ RegisterNetEvent('qb-policehelper:server:requestVehicle', function(garageIndex, 
         return
     end
 
+    local plate = vehicle.callsignPlate and ((Player.PlayerData.metadata or {}).callsign or job.name) or vehicle.plate
+    if plate then
+        plate = tostring(plate):sub(1, 8)
+        SetVehicleNumberPlateText(spawnedVehicle, plate)
+    else
+        plate = getPlate(spawnedVehicle)
+    end
+
     TriggerClientEvent(
         'qb-policehelper:client:vehicleSpawned',
         src,
@@ -451,11 +464,15 @@ RegisterNetEvent('qb-policehelper:server:requestVehicle', function(garageIndex, 
             extras = vehicle.extras or {},
             primaryColor = vehicle.primaryColor,
             secondaryColor = vehicle.secondaryColor,
-            plate = vehicle.callsignPlate and ((Player.PlayerData.metadata or {}).callsign or job.name) or vehicle.plate,
+            plate = plate,
             loadout = vehicle.loadout or {},
         }
     )
     Entity(spawnedVehicle).state:set('qbPoliceHelperLoadout', vehicle.loadout or {}, true)
+
+    if GetResourceState('qb-vehiclekeys') == 'started' then
+        exports['qb-vehiclekeys']:GiveKeys(src, plate)
+    end
 end)
 
 RegisterNetEvent('qb-policehelper:server:returnVehicle', function(garageIndex, category)
@@ -487,6 +504,9 @@ RegisterNetEvent('qb-policehelper:server:returnVehicle', function(garageIndex, c
     if not garageCoords or #(coords - vector3(garageCoords.x, garageCoords.y, garageCoords.z)) > 30.0 then
         notify(src, 'Return the vehicle at the garage.')
         return
+    end
+    if GetResourceState('qb-vehiclekeys') == 'started' then
+        exports['qb-vehiclekeys']:RemoveKeys(src, getPlate(vehicle))
     end
     DeleteEntity(vehicle)
     notify(src, 'Vehicle returned.', 'success')

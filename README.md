@@ -60,7 +60,7 @@ The new `pedModel` field lets you change the NPC spawned at each garage. If it i
 
 ## Usage
 
-Start the resource on your server. Peds are spawned automatically on resource start and display the configured target options. `qb-core`, `qb-target`, and `qb-menu` are required; `qb-management` is needed for boss menus and `LegacyFuel` is optional.
+Start the resource on your server. Peds are spawned automatically on resource start and display the configured target options. `qb-core`, `qb-target`, and `qb-menu` are required; `qb-management` is needed for boss menus, and `LegacyFuel` and `qb-vehiclekeys` are optional. When `qb-vehiclekeys` is started, players automatically receive keys for vehicles they check out from a garage, and those keys are removed when the vehicle is returned.
 
 ## In-game ped placement
 
