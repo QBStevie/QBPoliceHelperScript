@@ -145,13 +145,15 @@ local function setupJobActions()
 end
 
 RegisterNetEvent('qb-policehelper:openGarageMenu', function(data)
+    if type(data) ~= "table" then return end
     debugPrint("Received data:", json.encode(data)) 
     local garageName = data.garage_name
+    local garageIndex = tonumber(data.garageIndex)
     local carSpawns = data.carSpawns
     local vehicleList = data.vehicleList
     local PlayerData = QBCore.Functions.GetPlayerData()
-    local playerJob = PlayerData.job.name 
-    local playerRank = PlayerData.job.grade 
+    local playerJob = PlayerData and PlayerData.job and PlayerData.job.name
+    local playerRank = PlayerData and PlayerData.job and PlayerData.job.grade
 
 
     if garageName then
@@ -187,15 +189,10 @@ RegisterNetEvent('qb-policehelper:openGarageMenu', function(data)
     end
 
     if type(playerRank) == "table" then
-        if playerRank.grade then
-            playerRank = playerRank.grade  
-        elseif playerRank.level then
-            playerRank = playerRank.level  
-        else
-            playerRank = 0  
-        end
+        playerRank = playerRank.level or playerRank.grade or 0
         debugPrint("Player Rank (Fixed):", playerRank)
     end
+    playerRank = tonumber(playerRank) or 0
 
     local sanitizedSpawns = {}
     for index, spawn in ipairs(carSpawns) do
@@ -215,7 +212,7 @@ RegisterNetEvent('qb-policehelper:openGarageMenu', function(data)
         if hasRequiredRank and hasModel and spawnLocation then
             table.insert(options, {
                 label = vehicle.label,
-                vehicleModel = vehicle.model,
+                vehicleIndex = i,
                 spawnLocation = spawnLocation,
                 requiredRank = vehicle.rank
             })
@@ -231,9 +228,8 @@ RegisterNetEvent('qb-policehelper:openGarageMenu', function(data)
                 params = {
                     event = 'qb-policehelper:spawnVehicle',
                     args = {
-                        vehicleModel = option.vehicleModel,
-                        spawnLocation = option.spawnLocation,
-                        carSpawns = sanitizedSpawns
+                        garageIndex = garageIndex,
+                        vehicleIndex = option.vehicleIndex
                     }
                 }
             })
@@ -350,7 +346,8 @@ RegisterNetEvent('qb-policehelper:client:syncPlacements', function(placements)
 end)
 
 local function beginPlacement(kind, index)
-    local target = kind == "garage" and Config.PoliceGarages[index] or Config.BossMenus[index]
+    local targetList = kind == "garage" and Config.PoliceGarages or Config.BossMenus
+    local target = targetList[index]
     if not target then
         QBCore.Functions.Notify("That placement does not exist.", "error")
         return
@@ -376,7 +373,7 @@ local function beginPlacement(kind, index)
     SetEntityInvincible(ghost, true)
     SetModelAsNoLongerNeeded(model)
 
-    QBCore.Functions.Notify("Placement: WASD move, Q/E rotate, Page Up/Down adjust height, Enter save, Backspace cancel.", "primary", 8000)
+    QBCore.Functions.Notify("Placement: WASD move, Q/E rotate, Up/Down arrows adjust height, Enter save, Backspace cancel.", "primary", 8000)
     CreateThread(function()
         local confirmed = false
         while placementModeActive do
@@ -387,18 +384,18 @@ local function beginPlacement(kind, index)
             DisableControlAction(0, 35, true)
             DisableControlAction(0, 38, true)
             DisableControlAction(0, 44, true)
-            DisableControlAction(0, 10, true)
-            DisableControlAction(0, 11, true)
+            DisableControlAction(0, 172, true)
+            DisableControlAction(0, 173, true)
             DisableControlAction(0, 191, true)
             DisableControlAction(0, 177, true)
 
             BeginTextCommandDisplayHelp("STRING")
-            AddTextComponentSubstringPlayerName("~INPUT_MOVE_UP_ONLY~/~INPUT_MOVE_DOWN_ONLY~ move | ~INPUT_COVER~/~INPUT_TALK~ rotate | Page Up/Down height | Enter save | Backspace cancel")
+            AddTextComponentSubstringPlayerName("W/A/S/D move | Q/E rotate | Arrow Up/Down adjust height | Enter save | Backspace cancel")
             EndTextCommandDisplayHelp(0, false, true, -1)
 
             local position = GetEntityCoords(ghost)
             local heading = GetEntityHeading(ghost)
-            local step = GetFrameTime() * (IsDisabledControlPressed(0, 21) and 8.0 or 2.0)
+            local step = GetFrameTime() * (IsControlPressed(0, 21) and 8.0 or 2.0)
             local radians = math.rad(heading)
             local forwardX, forwardY = -math.sin(radians), math.cos(radians)
             local rightX, rightY = math.cos(radians), math.sin(radians)
@@ -407,8 +404,8 @@ local function beginPlacement(kind, index)
             if IsDisabledControlPressed(0, 33) then position = position - vector3(forwardX * step, forwardY * step, 0.0) end
             if IsDisabledControlPressed(0, 34) then position = position - vector3(rightX * step, rightY * step, 0.0) end
             if IsDisabledControlPressed(0, 35) then position = position + vector3(rightX * step, rightY * step, 0.0) end
-            if IsDisabledControlPressed(0, 10) then position = position + vector3(0.0, 0.0, step) end
-            if IsDisabledControlPressed(0, 11) then position = position - vector3(0.0, 0.0, step) end
+            if IsDisabledControlPressed(0, 172) then position = position + vector3(0.0, 0.0, step) end
+            if IsDisabledControlPressed(0, 173) then position = position - vector3(0.0, 0.0, step) end
             if IsDisabledControlPressed(0, 44) then heading = heading - 90.0 * GetFrameTime() end
             if IsDisabledControlPressed(0, 38) then heading = heading + 90.0 * GetFrameTime() end
             SetEntityCoordsNoOffset(ghost, position.x, position.y, position.z, false, false, false)
@@ -421,7 +418,7 @@ local function beginPlacement(kind, index)
                     x = finalCoords.x,
                     y = finalCoords.y,
                     z = finalCoords.z,
-                    heading = GetEntityHeading(ghost)
+                    heading = (GetEntityHeading(ghost) % 360.0 + 360.0) % 360.0
                 })
                 break
             elseif IsDisabledControlJustReleased(0, 177) then
