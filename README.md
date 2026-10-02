@@ -53,4 +53,4 @@ An administrator or god can place a garage or boss ped using:
 
 The selected ped appears at your current position. Use **W/A/S/D** to move, **Q/E** to rotate, **Up/Down arrows** to adjust height, **Enter** to save, or **Backspace** to cancel. Placements are persisted in `placements.json`; ensure the resource directory is writable by the FXServer process.
 
-The default police boss ped matches qb-management's default police boss-menu location. If you save it at another location, also add the same coordinate to that job's `Config.BossMenus` in qb-management; qb-management checks that location before opening the boss stash.
+The default police boss ped matches qb-management's default police boss-menu location. For each job, ensure its ped coordinate is also configured in that job's `Config.BossMenus` in qb-management; qb-management checks that location before opening the boss stash. This includes the BCSO Paleto boss menu.

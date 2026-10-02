@@ -61,6 +61,15 @@ Config.BossMenus = {
         pedHeading = 180.0,
         minimumGrade = 4, -- Minimum grade allowed to open (set nil to skip)
         requireBoss = true -- Set to false if non-boss grades should be able to use the menu
+    },
+    {
+        job = "bcso",
+        label = "BCSO Boss Menu",
+        pedModel = `s_m_y_sheriff_01`,
+        pedCoords = vector3(-443.5, 6012.7, 31.7),
+        pedHeading = 45.0,
+        minimumGrade = 4,
+        requireBoss = true
     }
 }
 
