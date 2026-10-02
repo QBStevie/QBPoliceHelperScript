@@ -1,11 +1,22 @@
 local QBCore = exports['qb-core']:GetCoreObject()
 local Config = Config or {}  -- Load the config
+local spawnedPeds = {}
+local placementModeActive = false
 
 --- Simple helper that only prints when debugging is enabled.
 ---@param ... any
 local function debugPrint(...)
     if not Config.debug then return end
     print(...)
+end
+
+local function removeSpawnedPeds()
+    for _, ped in pairs(spawnedPeds) do
+        if DoesEntityExist(ped) then
+            DeleteEntity(ped)
+        end
+    end
+    spawnedPeds = {}
 end
 
 -- Function to spawn the ped and garage interactions
@@ -17,7 +28,7 @@ local function spawnPedAndGarageInteractions()
 
     debugPrint("Spawning peds for garages...")  -- Debug message before spawning peds
 
-    for _, garage in ipairs(Config.PoliceGarages) do
+    for garageIndex, garage in ipairs(Config.PoliceGarages) do
         debugPrint("Creating ped for garage: " .. garage.name)  -- Debug message for each garage
 
         local pedModel = garage.pedModel or `s_m_y_cop_01`
@@ -40,6 +51,7 @@ local function spawnPedAndGarageInteractions()
                     icon = "fas fa-car",
                     label = "Access Police Garage",
                     jobType = "leo",
+                    garageIndex = garageIndex,
                     garage_name = garage.name,
                     carSpawns = garage.carSpawns,
                     vehicleList = garage.vehicleList
@@ -47,6 +59,7 @@ local function spawnPedAndGarageInteractions()
             },
             distance = 3.0
         })
+        spawnedPeds["garage:" .. garageIndex] = ped
 
         debugPrint("Ped created for garage: " .. garage.name)  -- Debug print for ped creation
     end
@@ -61,7 +74,7 @@ local function spawnBossMenuPeds()
 
     debugPrint("Spawning peds for boss menus...")
 
-    for _, bossMenu in ipairs(Config.BossMenus) do
+    for bossIndex, bossMenu in ipairs(Config.BossMenus) do
         if not bossMenu.pedCoords then
             debugPrint("Boss menu entry missing pedCoords, skipping.")
         else
@@ -87,6 +100,7 @@ local function spawnBossMenuPeds()
                         job = bossMenu.job,
                         jobType = bossMenu.jobType,
                         args = {
+                            bossIndex = bossIndex,
                             job = bossMenu.job,
                             minimumGrade = bossMenu.minimumGrade,
                             requireBoss = bossMenu.requireBoss,
@@ -95,6 +109,7 @@ local function spawnBossMenuPeds()
                 },
                 distance = bossMenu.distance or 2.0
             })
+            spawnedPeds["boss:" .. bossIndex] = ped
 
             debugPrint("Boss menu ped created for job: " .. (bossMenu.job or "unknown"))
         end
@@ -130,13 +145,15 @@ local function setupJobActions()
 end
 
 RegisterNetEvent('qb-policehelper:openGarageMenu', function(data)
+    if type(data) ~= "table" then return end
     debugPrint("Received data:", json.encode(data)) 
     local garageName = data.garage_name
+    local garageIndex = tonumber(data.garageIndex)
     local carSpawns = data.carSpawns
     local vehicleList = data.vehicleList
     local PlayerData = QBCore.Functions.GetPlayerData()
-    local playerJob = PlayerData.job.name 
-    local playerRank = PlayerData.job.grade 
+    local playerJob = PlayerData and PlayerData.job and PlayerData.job.name
+    local playerRank = PlayerData and PlayerData.job and PlayerData.job.grade
 
 
     if garageName then
@@ -172,15 +189,10 @@ RegisterNetEvent('qb-policehelper:openGarageMenu', function(data)
     end
 
     if type(playerRank) == "table" then
-        if playerRank.grade then
-            playerRank = playerRank.grade  
-        elseif playerRank.level then
-            playerRank = playerRank.level  
-        else
-            playerRank = 0  
-        end
+        playerRank = playerRank.level or playerRank.grade or 0
         debugPrint("Player Rank (Fixed):", playerRank)
     end
+    playerRank = tonumber(playerRank) or 0
 
     local sanitizedSpawns = {}
     for index, spawn in ipairs(carSpawns) do
@@ -200,7 +212,7 @@ RegisterNetEvent('qb-policehelper:openGarageMenu', function(data)
         if hasRequiredRank and hasModel and spawnLocation then
             table.insert(options, {
                 label = vehicle.label,
-                vehicleModel = vehicle.model,
+                vehicleIndex = i,
                 spawnLocation = spawnLocation,
                 requiredRank = vehicle.rank
             })
@@ -216,9 +228,8 @@ RegisterNetEvent('qb-policehelper:openGarageMenu', function(data)
                 params = {
                     event = 'qb-policehelper:spawnVehicle',
                     args = {
-                        vehicleModel = option.vehicleModel,
-                        spawnLocation = option.spawnLocation,
-                        carSpawns = sanitizedSpawns
+                        garageIndex = garageIndex,
+                        vehicleIndex = option.vehicleIndex
                     }
                 }
             })
@@ -284,74 +295,156 @@ RegisterNetEvent('qb-policehelper:openBossMenu', function(optionData)
         return
     end
 
-    TriggerServerEvent('qb-bossmenu:server:openMenu')
+    TriggerEvent('qb-bossmenu:client:OpenMenu')
 end)
 
 
 RegisterNetEvent('qb-policehelper:spawnVehicle', function(data)
-    local vehicleModel = data.vehicleModel
-    local spawnLocation = data.spawnLocation
-    local carSpawns = data.carSpawns or {}
+    if not data or not data.garageIndex or not data.vehicleIndex then return end
+    TriggerServerEvent('qb-policehelper:server:requestVehicle', data.garageIndex, data.vehicleIndex)
+end)
 
-    local function isSpawnOccupied(location)
-        if not location then return true end
-        local vehicles = GetGamePool('CVehicle')
-        for _, vehicle in ipairs(vehicles) do
-            local vehiclePos = GetEntityCoords(vehicle)
-            local distance = Vdist(vehiclePos.x, vehiclePos.y, vehiclePos.z, location.x, location.y, location.z)
-            if distance < 5.0 then
-                return true
-            end
-        end
-        return false
+RegisterNetEvent('qb-policehelper:client:vehicleSpawned', function(netId)
+    local timeout = GetGameTimer() + 5000
+    local vehicle = NetToVeh(netId)
+    while vehicle == 0 and GetGameTimer() < timeout do
+        Wait(50)
+        vehicle = NetToVeh(netId)
+    end
+    if vehicle == 0 then
+        QBCore.Functions.Notify("The vehicle could not be loaded.", "error")
+        return
     end
 
-    debugPrint("Requested vehicle model: ", vehicleModel)
-    debugPrint("Primary spawn location: ", json.encode(spawnLocation or {}))
-    debugPrint("Available carSpawns: ", json.encode(carSpawns))
+    SetEntityAsMissionEntity(vehicle, true, true)
+    exports['LegacyFuel']:SetFuel(vehicle, 100.0)
+    TaskWarpPedIntoVehicle(PlayerPedId(), vehicle, -1)
+end)
 
-    if isSpawnOccupied(spawnLocation) then
-        debugPrint("Spawn point occupied. Searching for an empty spot...")
-        local foundEmptySpot = false
-        for _, newSpawn in ipairs(carSpawns) do
-            if not isSpawnOccupied(newSpawn) then
-                spawnLocation = newSpawn
-                debugPrint("Found an available spawn point.")
-                foundEmptySpot = true
+local function applyPlacements(placements)
+    for index, placement in pairs(placements.garages or {}) do
+        local garage = Config.PoliceGarages[tonumber(index)]
+        if garage then
+            garage.pedCoords = vector3(placement.x, placement.y, placement.z)
+            garage.pedHeading = placement.heading
+        end
+    end
+    for index, placement in pairs(placements.bossMenus or {}) do
+        local bossMenu = Config.BossMenus[tonumber(index)]
+        if bossMenu then
+            bossMenu.pedCoords = vector3(placement.x, placement.y, placement.z)
+            bossMenu.pedHeading = placement.heading
+        end
+    end
+end
+
+RegisterNetEvent('qb-policehelper:client:syncPlacements', function(placements)
+    applyPlacements(placements or {})
+    removeSpawnedPeds()
+    spawnPedAndGarageInteractions()
+    spawnBossMenuPeds()
+end)
+
+local function beginPlacement(kind, index)
+    local targetList = kind == "garage" and Config.PoliceGarages or Config.BossMenus
+    local target = targetList[index]
+    if not target then
+        QBCore.Functions.Notify("That placement does not exist.", "error")
+        return
+    end
+    if placementModeActive then return end
+    placementModeActive = true
+
+    local model = target.pedModel or (kind == "garage" and `s_m_y_cop_01` or `s_m_m_security_01`)
+    RequestModel(model)
+    local timeout = GetGameTimer() + 10000
+    while not HasModelLoaded(model) and GetGameTimer() < timeout do Wait(50) end
+    if not HasModelLoaded(model) then
+        placementModeActive = false
+        QBCore.Functions.Notify("Could not load the placement ped model.", "error")
+        return
+    end
+
+    local coords = GetEntityCoords(PlayerPedId())
+    local ghost = CreatePed(4, model, coords.x, coords.y, coords.z, GetEntityHeading(PlayerPedId()), false, false)
+    SetEntityAlpha(ghost, 150, false)
+    SetEntityCollision(ghost, false, false)
+    FreezeEntityPosition(ghost, true)
+    SetEntityInvincible(ghost, true)
+    SetModelAsNoLongerNeeded(model)
+
+    QBCore.Functions.Notify("Placement: WASD move, Q/E rotate, Up/Down arrows adjust height, Enter save, Backspace cancel.", "primary", 8000)
+    CreateThread(function()
+        local confirmed = false
+        while placementModeActive do
+            Wait(0)
+            DisableControlAction(0, 32, true)
+            DisableControlAction(0, 33, true)
+            DisableControlAction(0, 34, true)
+            DisableControlAction(0, 35, true)
+            DisableControlAction(0, 38, true)
+            DisableControlAction(0, 44, true)
+            DisableControlAction(0, 172, true)
+            DisableControlAction(0, 173, true)
+            DisableControlAction(0, 191, true)
+            DisableControlAction(0, 177, true)
+
+            BeginTextCommandDisplayHelp("STRING")
+            AddTextComponentSubstringPlayerName("W/A/S/D move | Q/E rotate | Arrow Up/Down adjust height | Enter save | Backspace cancel")
+            EndTextCommandDisplayHelp(0, false, true, -1)
+
+            local position = GetEntityCoords(ghost)
+            local heading = GetEntityHeading(ghost)
+            local step = GetFrameTime() * (IsControlPressed(0, 21) and 8.0 or 2.0)
+            local radians = math.rad(heading)
+            local forwardX, forwardY = -math.sin(radians), math.cos(radians)
+            local rightX, rightY = math.cos(radians), math.sin(radians)
+
+            if IsDisabledControlPressed(0, 32) then position = position + vector3(forwardX * step, forwardY * step, 0.0) end
+            if IsDisabledControlPressed(0, 33) then position = position - vector3(forwardX * step, forwardY * step, 0.0) end
+            if IsDisabledControlPressed(0, 34) then position = position - vector3(rightX * step, rightY * step, 0.0) end
+            if IsDisabledControlPressed(0, 35) then position = position + vector3(rightX * step, rightY * step, 0.0) end
+            if IsDisabledControlPressed(0, 172) then position = position + vector3(0.0, 0.0, step) end
+            if IsDisabledControlPressed(0, 173) then position = position - vector3(0.0, 0.0, step) end
+            if IsDisabledControlPressed(0, 44) then heading = heading - 90.0 * GetFrameTime() end
+            if IsDisabledControlPressed(0, 38) then heading = heading + 90.0 * GetFrameTime() end
+            SetEntityCoordsNoOffset(ghost, position.x, position.y, position.z, false, false, false)
+            SetEntityHeading(ghost, heading)
+
+            if IsDisabledControlJustReleased(0, 191) then
+                confirmed = true
+                local finalCoords = GetEntityCoords(ghost)
+                TriggerServerEvent('qb-policehelper:server:savePlacement', kind, index, {
+                    x = finalCoords.x,
+                    y = finalCoords.y,
+                    z = finalCoords.z,
+                    heading = (GetEntityHeading(ghost) % 360.0 + 360.0) % 360.0
+                })
+                break
+            elseif IsDisabledControlJustReleased(0, 177) then
                 break
             end
         end
 
-        if not foundEmptySpot then
-            debugPrint("No empty spawn spots available.")
-            QBCore.Functions.Notify("No empty spawn spots available!", "error")
-            return
-        end
-    end
+        if DoesEntityExist(ghost) then DeleteEntity(ghost) end
+        placementModeActive = false
+        if not confirmed then QBCore.Functions.Notify("Placement cancelled.", "error") end
+    end)
+end
 
-    if not vehicleModel or not spawnLocation then
-        debugPrint("Vehicle model or spawn location missing, aborting spawn.")
-        QBCore.Functions.Notify("Invalid vehicle information received!", "error")
-        return
-    end
-
-    RequestModel(vehicleModel)
-    while not HasModelLoaded(vehicleModel) do
-        Wait(500)
-    end
-
-    local vehicle = CreateVehicle(vehicleModel, spawnLocation.x, spawnLocation.y, spawnLocation.z, spawnLocation.w, true, false)
-
-    exports['LegacyFuel']:SetFuel(vehicle, 100.0)
-
-    SetEntityAsMissionEntity(vehicle, true, true)
-    local playerPed = PlayerPedId()
-    TaskWarpPedIntoVehicle(playerPed, vehicle, -1)
-
-
-    debugPrint("Vehicle spawned with full fuel: " .. vehicleModel)
+RegisterNetEvent('qb-policehelper:client:startPlacement', function(kind, index)
+    beginPlacement(kind, index)
 end)
 
-spawnPedAndGarageInteractions()
-spawnBossMenuPeds()
+RegisterCommand('qbph_place', function(_, args)
+    local kind = args[1]
+    local index = tonumber(args[2])
+    if (kind ~= "garage" and kind ~= "boss") or not index or index < 1 or index % 1 ~= 0 then
+        QBCore.Functions.Notify("Usage: /qbph_place <garage|boss> <index>", "error")
+        return
+    end
+    TriggerServerEvent('qb-policehelper:server:requestPlacementMode', kind, index)
+end, false)
+
 setupJobActions()
+TriggerServerEvent('qb-policehelper:server:requestPlacements')
