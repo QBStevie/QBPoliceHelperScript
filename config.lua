@@ -18,6 +18,21 @@ Config.PoliceGarages = {
             {model = "police2", label = "Police Interceptor", rank = 2},
             {model = "sheriff", label = "Sheriff Vehicle", rank = 3},
         }
+    },
+    {
+        name = "BCSO Paleto Garage",
+        pedModel = `s_m_y_sheriff_01`,
+        pedCoords = vector3(-449.0, 6013.2, 31.7),
+        pedHeading = 45.0,
+        carSpawns = {
+            vector4(-461.6, 6021.5, 31.3, 45.0),
+            vector4(-466.1, 6025.5, 31.3, 45.0),
+            vector4(-470.6, 6029.5, 31.3, 45.0),
+        },
+        vehicleList = {
+            {model = "sheriff", label = "BCSO Sheriff Cruiser", rank = 1},
+            {model = "sheriff2", label = "BCSO Sheriff SUV", rank = 2},
+        }
     },--[[
     {
         name = "Police Garage 2",
